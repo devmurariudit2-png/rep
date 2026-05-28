@@ -17,7 +17,7 @@ export function Navbar() {
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
-    setMounted(true);
+    setTimeout(() => setMounted(true), 0);
     const handleScroll = () => {
       if (window.scrollY > 20) {
         setScrolled(true);

@@ -116,7 +116,6 @@ export function AiChatFloating() {
     "Show investment opportunities",
     "Tell me about the Bodakdev villa"
   ];
-
   const handleSendMessage = async (text: string) => {
     if (!text.trim() || isTyping) return;
 
@@ -126,16 +125,40 @@ export function AiChatFloating() {
     setIsTyping(true);
 
     try {
-      const response = await getAIChatResponse([...messages, userMessage]);
-      setMessages((prev) => [...prev, { role: "assistant", content: response }]);
-    } catch {
-      setMessages((prev) => [
-        ...prev,
-        {
-          role: "assistant",
-          content: "My connection is temporarily interrupted. Please re-trigger your query."
-        }
-      ]);
+      // 1. Attempt to query live API Route
+      const apiResponse = await fetch("/api/chat", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          messages: [...messages, userMessage],
+        }),
+      });
+
+      if (apiResponse.ok) {
+        const data = await apiResponse.json();
+        setMessages((prev) => [...prev, { role: "assistant", content: data.response }]);
+      } else {
+        // 2. Fall back to local client-side heuristic engine if API key is missing/error
+        console.log("Gemini API not configured or failed, falling back to local simulation.");
+        const localResponse = await getAIChatResponse([...messages, userMessage]);
+        setMessages((prev) => [...prev, { role: "assistant", content: localResponse }]);
+      }
+    } catch (err) {
+      console.error("Chat API error, falling back to local simulation:", err);
+      try {
+        const localResponse = await getAIChatResponse([...messages, userMessage]);
+        setMessages((prev) => [...prev, { role: "assistant", content: localResponse }]);
+      } catch {
+        setMessages((prev) => [
+          ...prev,
+          {
+            role: "assistant",
+            content: "My connection is temporarily interrupted. Please re-trigger your query."
+          }
+        ]);
+      }
     } finally {
       setIsTyping(false);
     }
