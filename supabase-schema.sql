@@ -320,26 +320,53 @@ VALUES
     {"action": "Scheduled developer board conference call", "timestamp": "2026-05-26T11:00:00Z"}
   ]'::jsonb
 ),
-(
-  '9ea5fb57-6fcb-4c4b-b0b9-3b91811e5ad5',
-  'Sneha Patel',
-  'sneha.patel@accenture.com',
-  '+91 94270 55432',
-  'prop-gift-city-residence',
-  'Vanguard Corporate Suites',
-  'closed',
-  92,
-  'hot',
-  'Secured tech lease profile. Fast closing. Looking for rental investment near IFSC. Transaction complete.',
-  'delivered',
-  '[
-    {"sender": "agent", "message": "Congratulations Sneha! The bank has released the home loan disbursement for Vanguard Corporate Suite 404. All registry papers are complete.", "timestamp": "2026-05-23T11:30:00Z"},
-    {"sender": "lead", "message": "Thank you for all the help! The REOP platform made the paper validation and digital signatures super smooth.", "timestamp": "2026-05-23T11:45:00Z"}
-  ]'::jsonb,
-  '[
-    {"action": "Selected Vanguard Corporate Suite", "timestamp": "2026-05-20T11:05:00Z"},
-    {"action": "e-Signed booking form via digital interface", "timestamp": "2026-05-21T09:00:00Z"},
-    {"action": "Transaction closed and home loan approved", "timestamp": "2026-05-23T11:30:00Z"}
-  ]'::jsonb
-)
+  (
+    '9ea5fb57-6fcb-4c4b-b0b9-3b91811e5ad5',
+    'Sneha Patel',
+    'sneha.patel@accenture.com',
+    '+91 94270 55432',
+    'prop-gift-city-residence',
+    'Vanguard Corporate Suites',
+    'closed',
+    92,
+    'hot',
+    'Secured tech lease profile. Fast closing. Looking for rental investment near IFSC. Transaction complete.',
+    'delivered',
+    '[
+      {"sender": "agent", "message": "Congratulations Sneha! The bank has released the home loan disbursement for Vanguard Corporate Suite 404. All registry papers are complete.", "timestamp": "2026-05-23T11:30:00Z"},
+      {"sender": "lead", "message": "Thank you for all the help! The REOP platform made the paper validation and digital signatures super smooth.", "timestamp": "2026-05-23T11:45:00Z"}
+    ]'::jsonb,
+    '[
+      {"action": "Selected Vanguard Corporate Suite", "timestamp": "2026-05-20T11:05:00Z"},
+      {"action": "e-Signed booking form via digital interface", "timestamp": "2026-05-21T09:00:00Z"},
+      {"action": "Transaction closed and home loan approved", "timestamp": "2026-05-23T11:30:00Z"}
+    ]'::jsonb
+  )
 ON CONFLICT (id) DO NOTHING;
+
+-- ========================================================
+-- 4. STORAGE BUCKET CONFIGURATION (PROPERTY IMAGES)
+-- ========================================================
+
+-- Insert storage bucket configuration
+INSERT INTO storage.buckets (id, name, public)
+VALUES ('property-images', 'property-images', true)
+ON CONFLICT (id) DO NOTHING;
+
+-- Policy to allow anonymous read access to images
+CREATE POLICY "Allow public read access to property images"
+ON storage.objects FOR SELECT
+USING (bucket_id = 'property-images');
+
+-- Policy to allow authenticated users to upload images
+CREATE POLICY "Allow authenticated users to upload property images"
+ON storage.objects FOR INSERT
+TO authenticated
+WITH CHECK (bucket_id = 'property-images' AND auth.role() = 'authenticated');
+
+-- Policy to allow authenticated users to delete property images
+CREATE POLICY "Allow authenticated users to delete property images"
+ON storage.objects FOR DELETE
+TO authenticated
+USING (bucket_id = 'property-images' AND auth.role() = 'authenticated');
+

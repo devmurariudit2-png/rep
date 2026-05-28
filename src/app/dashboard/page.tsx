@@ -18,7 +18,8 @@ import {
   ChevronRight,
   ClipboardList,
   Building,
-  Mic
+  Mic,
+  Upload
 } from "lucide-react";
 import { useMockDb } from "@/lib/context/mock-db-context";
 import { useTheme } from "@/lib/context/theme-context";
@@ -61,7 +62,8 @@ export default function DashboardPage() {
     addProperty,
     deleteProperty,
     sendWhatsAppMessage,
-    logout
+    logout,
+    uploadPropertyImage
   } = useMockDb();
 
   // Sidebar navigation active tab
@@ -148,6 +150,9 @@ export default function DashboardPage() {
   const [propDeveloper, setPropDeveloper] = useState("");
   const [propDescription, setPropDescription] = useState("");
   const [inventorySuccess, setInventorySuccess] = useState(false);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [isUploadingImage, setIsUploadingImage] = useState(false);
+  const [imagePreview, setImagePreview] = useState("");
 
   // Set default selected lead on load
   useEffect(() => {
@@ -190,9 +195,30 @@ export default function DashboardPage() {
     setWhatsAppInput("");
   };
 
-  const handleAddPropertySubmit = (e: React.FormEvent) => {
+  const handleAddPropertySubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!propTitle || !propPrice || !propArea || !propDeveloper) return;
+
+    let imageUrls = [
+      propType === "office"
+        ? "https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?auto=format&fit=crop&w=1200&q=80"
+        : propType === "plot"
+          ? "https://images.unsplash.com/photo-1500382017468-9049fed747ef?auto=format&fit=crop&w=1200&q=80"
+          : "https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?auto=format&fit=crop&w=1200&q=80"
+    ];
+
+    if (selectedFile) {
+      setIsUploadingImage(true);
+      try {
+        const publicUrl = await uploadPropertyImage(selectedFile);
+        imageUrls = [publicUrl];
+      } catch (err) {
+        console.error("Image upload failed:", err);
+        alert("Image upload failed. Defaulting to placeholder image.");
+      } finally {
+        setIsUploadingImage(false);
+      }
+    }
 
     const newProp: Property = {
       id: `prop-${Math.random().toString(36).substr(2, 9)}`,
@@ -204,13 +230,7 @@ export default function DashboardPage() {
       beds: propType === "apartment" || propType === "villa" ? Number(propBeds) : undefined,
       baths: propType === "apartment" || propType === "villa" ? Number(propBaths) : undefined,
       area: propArea,
-      images: [
-        propType === "office"
-          ? "https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?auto=format&fit=crop&w=1200&q=80"
-          : propType === "plot"
-            ? "https://images.unsplash.com/photo-1500382017468-9049fed747ef?auto=format&fit=crop&w=1200&q=80"
-            : "https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?auto=format&fit=crop&w=1200&q=80"
-      ],
+      images: imageUrls,
       roi: propLocation === "GIFT City" ? 13.5 : 9.8,
       rentalYield: propType === "office" ? 8.2 : propLocation === "GIFT City" ? 5.8 : 3.2,
       description: propDescription || "Premium high-grade real estate asset parsed by REOP developer portal.",
@@ -230,6 +250,8 @@ export default function DashboardPage() {
     setPropArea("");
     setPropDeveloper("");
     setPropDescription("");
+    setSelectedFile(null);
+    setImagePreview("");
 
     setTimeout(() => setInventorySuccess(false), 4000);
   };
@@ -973,6 +995,45 @@ export default function DashboardPage() {
                       </div>
                     </div>
 
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                        Property Cover Image
+                      </label>
+                      <div className="relative group cursor-pointer border border-dashed border-white/20 hover:border-gold/50 rounded-lg p-3 transition-all duration-300 bg-black/20 dark:bg-white/2 hover:bg-black/30 dark:hover:bg-white/5">
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (file) {
+                              setSelectedFile(file);
+                              setImagePreview(URL.createObjectURL(file));
+                            }
+                          }}
+                          className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10 font-bold"
+                        />
+                        {imagePreview ? (
+                          <div className="relative h-24 w-full rounded overflow-hidden">
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img
+                              src={imagePreview}
+                              alt="Upload preview"
+                              className="h-full w-full object-cover"
+                            />
+                            <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                              <span className="text-[10px] text-white font-bold uppercase tracking-wider">Change Image</span>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="flex flex-col items-center justify-center py-2 text-muted-foreground gap-1.5">
+                            <Upload className="h-5 w-5 text-gold/60" />
+                            <span className="text-[10px] uppercase font-bold tracking-wider">Select Image File</span>
+                            <span className="text-[9px] text-muted-foreground/60">Supports PNG, JPG, WebP</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
                     <Textarea
                       label="Property Description"
                       placeholder="Brief architectural details..."
@@ -980,7 +1041,7 @@ export default function DashboardPage() {
                       onChange={(e) => setPropDescription(e.target.value)}
                     />
 
-                    <Button type="submit" variant="gold" className="w-full mt-2 font-bold gap-2">
+                    <Button type="submit" variant="gold" className="w-full mt-2 font-bold gap-2" isLoading={isUploadingImage}>
                       <Plus className="h-4.5 w-4.5" /> Publish Stock Listing
                     </Button>
                   </form>

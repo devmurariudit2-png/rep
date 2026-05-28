@@ -25,6 +25,7 @@ interface MockDbContextType {
   login: (email: string, role: User["role"], name?: string) => Promise<boolean>;
   signup: (name: string, email: string, role: User["role"]) => Promise<boolean>;
   logout: () => void;
+  uploadPropertyImage: (file: File) => Promise<string>;
 }
 
 const MockDbContext = createContext<MockDbContextType | undefined>(undefined);
@@ -611,6 +612,31 @@ export function MockDbProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const uploadPropertyImage = async (file: File): Promise<string> => {
+    if (supabase) {
+      const fileExt = file.name.split(".").pop();
+      const fileName = `${Math.random().toString(36).substring(2, 15)}_${Date.now()}.${fileExt}`;
+      const filePath = `listings/${fileName}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from("property-images")
+        .upload(filePath, file);
+
+      if (uploadError) {
+        console.error("Error uploading image to Supabase storage:", uploadError);
+        throw uploadError;
+      }
+
+      const { data } = supabase.storage
+        .from("property-images")
+        .getPublicUrl(filePath);
+
+      return data.publicUrl;
+    } else {
+      return URL.createObjectURL(file);
+    }
+  };
+
   const logout = async () => {
     if (supabase) {
       await supabase.auth.signOut();
@@ -636,7 +662,8 @@ export function MockDbProvider({ children }: { children: React.ReactNode }) {
         sendWhatsAppMessage,
         login,
         signup,
-        logout
+        logout,
+        uploadPropertyImage
       }}
     >
       {children}
