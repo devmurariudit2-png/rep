@@ -1,0 +1,34 @@
+{
+  "comment": "REOP Supabase MCP Integration Configuration Template",
+  "configurations": {
+    "claude_desktop_with_env_sync": {
+      "instructions": "Ensure your .env.local file contains your credentials (NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_KEY), then place this snippet inside: ~/Library/Application Support/Claude/claude_desktop_config.json",
+      "snippet": {
+        "mcpServers": {
+          "supabase-db": {
+            "command": "node",
+            "args": [
+              "/Users/uditdevmurari/Documents/Project REOP/supabase-mcp.js"
+            ]
+          }
+        }
+      }
+    },
+    "cursor_with_env_sync": {
+      "instructions": "In Cursor, go to Settings -> Features -> MCP, click '+ Add New MCP Server', and configure as follows:",
+      "params": {
+        "Name": "supabase-db",
+        "Type": "command",
+        "Command": "node \"/Users/uditdevmurari/Documents/Project REOP/supabase-mcp.js\""
+      }
+    },
+    "oauth_gateway_fallback": {
+      "instructions": "If you prefer not to manage private service keys, you can connect to the hosted OAuth gateway:",
+      "params": {
+        "Name": "supabase-oauth",
+        "Type": "sse",
+        "URL": "https://mcp.supabase.com/mcp"
+      }
+    }
+  }
+}
