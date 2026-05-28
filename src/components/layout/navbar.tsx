@@ -14,8 +14,10 @@ export function Navbar() {
   const { currentUser, logout } = useMockDb();
   const [isOpen, setIsOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
+  const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
+    setMounted(true);
     const handleScroll = () => {
       if (window.scrollY > 20) {
         setScrolled(true);
@@ -31,6 +33,11 @@ export function Navbar() {
     { name: "Properties", href: "/properties" },
     { name: "Dashboard", href: "/dashboard" },
   ];
+
+  const renderThemeIcon = () => {
+    if (!mounted) return <div className="h-5 w-5" />; // placeholder to prevent hydration mismatch
+    return theme === "dark" ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />;
+  };
 
   return (
     <nav
@@ -84,7 +91,7 @@ export function Navbar() {
               className="p-2 rounded-full hover:bg-white/10 dark:hover:bg-white/5 text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
               aria-label="Toggle theme"
             >
-              {theme === "dark" ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
+              {renderThemeIcon()}
             </button>
 
             {currentUser ? (
@@ -117,7 +124,7 @@ export function Navbar() {
             onClick={toggleTheme}
             className="p-2 rounded-full text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
           >
-            {theme === "dark" ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
+            {renderThemeIcon()}
           </button>
 
           <button
