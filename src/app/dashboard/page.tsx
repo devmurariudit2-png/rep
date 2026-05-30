@@ -63,7 +63,8 @@ export default function DashboardPage() {
     deleteProperty,
     sendWhatsAppMessage,
     logout,
-    uploadPropertyImage
+    uploadPropertyImage,
+    refreshDb
   } = useMockDb();
 
   // Sidebar navigation active tab
@@ -154,6 +155,13 @@ export default function DashboardPage() {
   const [isUploadingImage, setIsUploadingImage] = useState(false);
   const [imagePreview, setImagePreview] = useState("");
 
+  // Lead capture ingestion state
+  const [rawInboundAlert, setRawInboundAlert] = useState("");
+  const [isIngestingLead, setIsIngestingLead] = useState(false);
+  const [ingestionSuccess, setIngestionSuccess] = useState(false);
+  const [inboundSource, setInboundSource] = useState("magicbricks");
+  const [ingestionError, setIngestionError] = useState("");
+
   // Set default selected lead on load
   useEffect(() => {
     if (leads.length > 0 && !selectedLeadId) {
@@ -193,6 +201,41 @@ export default function DashboardPage() {
 
     sendWhatsAppMessage(selectedLeadId, whatsAppInput, "agent");
     setWhatsAppInput("");
+  };
+
+  const handleIngestLeadAlert = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!rawInboundAlert.trim()) return;
+
+    setIsIngestingLead(true);
+    setIngestionSuccess(false);
+    setIngestionError("");
+
+    try {
+      const response = await fetch("/api/leads/capture", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          rawText: rawInboundAlert,
+          source: inboundSource
+        })
+      });
+
+      const result = await response.json();
+      if (!response.ok) {
+        throw new Error(result.error || "Lead capture request failed.");
+      }
+
+      setIngestionSuccess(true);
+      setRawInboundAlert("");
+      await refreshDb(false); // Refresh leads list in background!
+    } catch (err: unknown) {
+      console.error(err);
+      setIngestionError(err instanceof Error ? err.message : "Lead capture failed.");
+    } finally {
+      setIsIngestingLead(false);
+      setTimeout(() => setIngestionSuccess(false), 4000);
+    }
   };
 
   const handleAddPropertySubmit = async (e: React.FormEvent) => {
@@ -608,6 +651,63 @@ export default function DashboardPage() {
                       Delete Lead Record
                     </Button>
                   </div>
+                </Card>
+
+                <Card className="border border-white/10 p-5 shadow-lg flex flex-col gap-4 bg-card mt-6">
+                  <div>
+                    <h3 className="text-sm font-bold text-foreground">Inbound Lead Capture Hub</h3>
+                    <p className="text-[11px] text-muted-foreground mt-0.5">
+                      Simulate third-party listing alerts (MagicBricks/99acres) using Gemini parsing.
+                    </p>
+                  </div>
+
+                  {ingestionSuccess && (
+                    <p className="text-[10px] text-emerald-500 font-semibold bg-emerald-500/15 border border-emerald-500/30 p-2 rounded text-center">
+                      ✓ Lead successfully parsed & registered!
+                    </p>
+                  )}
+
+                  {ingestionError && (
+                    <p className="text-[10px] text-red-500 font-semibold bg-red-500/15 border border-red-500/30 p-2 rounded text-center">
+                      ⚠️ {ingestionError}
+                    </p>
+                  )}
+
+                  <form onSubmit={handleIngestLeadAlert} className="flex flex-col gap-3">
+                    <div className="flex flex-col gap-1">
+                      <label className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                        Alert Source
+                      </label>
+                      <select
+                        value={inboundSource}
+                        onChange={(e) => setInboundSource(e.target.value)}
+                        className="glass-input h-9 px-3 text-xs text-foreground rounded-lg focus:outline-none focus:ring-1 focus:ring-gold/60 cursor-pointer"
+                      >
+                        <option value="magicbricks" className="bg-card text-foreground">MagicBricks Alert</option>
+                        <option value="99acres" className="bg-card text-foreground">99acres Alert</option>
+                        <option value="facebook_ads" className="bg-card text-foreground">Facebook Lead Ad</option>
+                        <option value="direct_website" className="bg-card text-foreground">Direct Website Webform</option>
+                      </select>
+                    </div>
+
+                    <div className="flex flex-col gap-1">
+                      <label className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                        Raw Copy-Pasted Alert / Email
+                      </label>
+                      <textarea
+                        value={rawInboundAlert}
+                        onChange={(e) => setRawInboundAlert(e.target.value)}
+                        placeholder="e.g. Hi REOP, you have a new inquiry. Inquirer Varun Patel, Mobile 9876543210. Budget: 2.2 Crore. Requirements: interested in luxury 3 BHK in Bodakdev."
+                        className="glass-input min-h-[90px] p-3 text-xs text-foreground rounded-lg focus:outline-none focus:ring-1 focus:ring-gold/60 resize-none font-mono leading-relaxed"
+                        required
+                        disabled={isIngestingLead}
+                      />
+                    </div>
+
+                    <Button type="submit" variant="gold" className="w-full text-xs font-bold gap-2 h-9" isLoading={isIngestingLead}>
+                      <Zap className="h-3.5 w-3.5" /> Parse & Ingest Lead
+                    </Button>
+                  </form>
                 </Card>
               </div>
             </div>

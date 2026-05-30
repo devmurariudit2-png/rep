@@ -26,6 +26,7 @@ interface MockDbContextType {
   signup: (name: string, email: string, role: User["role"]) => Promise<boolean>;
   logout: () => void;
   uploadPropertyImage: (file: File) => Promise<string>;
+  refreshDb: (showSpinner?: boolean) => Promise<void>;
 }
 
 const MockDbContext = createContext<MockDbContextType | undefined>(undefined);
@@ -174,112 +175,110 @@ export function MockDbProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const refreshDb = async (showSpinner = false) => {
+    if (showSpinner) setIsLoading(true);
+    if (supabase) {
+      try {
+        await refreshSupabaseSession();
+
+        const { data: props, error: propsErr } = await supabase
+          .from("properties")
+          .select("*")
+          .order("created_at", { ascending: false });
+
+        if (!propsErr && props) {
+          const mappedProps = props.map(p => ({
+            id: p.id,
+            title: p.title,
+            type: p.type as Property["type"],
+            price: Number(p.price),
+            location: p.location,
+            subLocation: p.sub_location,
+            beds: p.beds ?? undefined,
+            baths: p.baths ?? undefined,
+            area: p.area,
+            images: p.images,
+            roi: Number(p.roi),
+            rentalYield: p.rental_yield ? Number(p.rental_yield) : undefined,
+            description: p.description,
+            amenities: p.amenities,
+            features: p.features,
+            projectedAppreciation5Yr: Number(p.projected_appreciation_5yr),
+            address: p.address,
+            developer: p.developer
+          }));
+          setProperties(mappedProps);
+        } else {
+          setProperties([]);
+        }
+
+        const { data: leadsData, error: leadsErr } = await supabase
+          .from("leads")
+          .select("*")
+          .order("created_at", { ascending: false });
+
+        if (!leadsErr && leadsData) {
+          const mappedLeads = leadsData.map(l => ({
+            id: l.id,
+            name: l.name,
+            email: l.email,
+            phone: l.phone,
+            interestedPropertyId: l.interested_property_id || "",
+            propertyName: l.property_name,
+            status: l.status as Lead["status"],
+            aiScore: Number(l.ai_score),
+            leadQuality: l.lead_quality as Lead["leadQuality"],
+            aiReasoning: l.ai_reasoning,
+            createdAt: l.created_at,
+            whatsAppStatus: l.whatsapp_status as Lead["whatsAppStatus"],
+            whatsAppHistory: l.whatsapp_history as WhatsAppMessage[],
+            activityLog: l.activity_log
+          }));
+          setLeads(mappedLeads);
+        } else {
+          setLeads([]);
+        }
+      } catch (err) {
+        console.error("Error refreshing Supabase backend:", err);
+      }
+    } else {
+      const storedProperties = localStorage.getItem("reop-properties");
+      if (storedProperties) {
+        setProperties(JSON.parse(storedProperties));
+      } else {
+        localStorage.setItem("reop-properties", JSON.stringify(mockProperties));
+        setProperties(mockProperties);
+      }
+
+      const storedLeads = localStorage.getItem("reop-leads");
+      if (storedLeads) {
+        setLeads(JSON.parse(storedLeads));
+      } else {
+        localStorage.setItem("reop-leads", JSON.stringify(mockLeads));
+        setLeads(mockLeads);
+      }
+
+      const storedUser = localStorage.getItem("reop-user");
+      if (storedUser) {
+        setCurrentUser(JSON.parse(storedUser));
+      } else {
+        const defaultUser: User = {
+          name: "Devam Shah",
+          email: "devam@reop.in",
+          role: "admin"
+        };
+        localStorage.setItem("reop-user", JSON.stringify(defaultUser));
+        setCurrentUser(defaultUser);
+      }
+    }
+    if (showSpinner) setIsLoading(false);
+  };
+
   // Initial load
   useEffect(() => {
-    const loadData = async () => {
-      if (supabase) {
-        try {
-          // 1. Refresh auth state
-          await refreshSupabaseSession();
-
-          // 2. Fetch properties
-          const { data: props, error: propsErr } = await supabase
-            .from("properties")
-            .select("*")
-            .order("created_at", { ascending: false });
-
-          if (!propsErr && props) {
-            const mappedProps = props.map(p => ({
-              id: p.id,
-              title: p.title,
-              type: p.type as Property["type"],
-              price: Number(p.price),
-              location: p.location,
-              subLocation: p.sub_location,
-              beds: p.beds ?? undefined,
-              baths: p.baths ?? undefined,
-              area: p.area,
-              images: p.images,
-              roi: Number(p.roi),
-              rentalYield: p.rental_yield ? Number(p.rental_yield) : undefined,
-              description: p.description,
-              amenities: p.amenities,
-              features: p.features,
-              projectedAppreciation5Yr: Number(p.projected_appreciation_5yr),
-              address: p.address,
-              developer: p.developer
-            }));
-            setProperties(mappedProps);
-          } else {
-            setProperties([]);
-          }
-
-          // 3. Fetch leads
-          const { data: leadsData, error: leadsErr } = await supabase
-            .from("leads")
-            .select("*")
-            .order("created_at", { ascending: false });
-
-          if (!leadsErr && leadsData) {
-            const mappedLeads = leadsData.map(l => ({
-              id: l.id,
-              name: l.name,
-              email: l.email,
-              phone: l.phone,
-              interestedPropertyId: l.interested_property_id || "",
-              propertyName: l.property_name,
-              status: l.status as Lead["status"],
-              aiScore: Number(l.ai_score),
-              leadQuality: l.lead_quality as Lead["leadQuality"],
-              aiReasoning: l.ai_reasoning,
-              createdAt: l.created_at,
-              whatsAppStatus: l.whatsapp_status as Lead["whatsAppStatus"],
-              whatsAppHistory: l.whatsapp_history as WhatsAppMessage[],
-              activityLog: l.activity_log
-            }));
-            setLeads(mappedLeads);
-          } else {
-            setLeads([]);
-          }
-        } catch (err) {
-          console.error("Error initializing Supabase backend:", err);
-        }
-      } else {
-        // Fallback: LocalStorage
-        const storedProperties = localStorage.getItem("reop-properties");
-        if (storedProperties) {
-          setProperties(JSON.parse(storedProperties));
-        } else {
-          localStorage.setItem("reop-properties", JSON.stringify(mockProperties));
-          setProperties(mockProperties);
-        }
-
-        const storedLeads = localStorage.getItem("reop-leads");
-        if (storedLeads) {
-          setLeads(JSON.parse(storedLeads));
-        } else {
-          localStorage.setItem("reop-leads", JSON.stringify(mockLeads));
-          setLeads(mockLeads);
-        }
-
-        const storedUser = localStorage.getItem("reop-user");
-        if (storedUser) {
-          setCurrentUser(JSON.parse(storedUser));
-        } else {
-          const defaultUser: User = {
-            name: "Devam Shah",
-            email: "devam@reop.in",
-            role: "admin"
-          };
-          localStorage.setItem("reop-user", JSON.stringify(defaultUser));
-          setCurrentUser(defaultUser);
-        }
-      }
-      setIsLoading(false);
-    };
-
-    const timer = setTimeout(loadData, 0);
+    const timer = setTimeout(() => refreshDb(true), 0);
     return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Listen for Supabase Auth updates dynamically
@@ -663,7 +662,8 @@ export function MockDbProvider({ children }: { children: React.ReactNode }) {
         login,
         signup,
         logout,
-        uploadPropertyImage
+        uploadPropertyImage,
+        refreshDb
       }}
     >
       {children}
