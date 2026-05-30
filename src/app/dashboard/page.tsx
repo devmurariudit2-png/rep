@@ -629,6 +629,21 @@ export default function DashboardPage() {
 
                   {/* Manual WhatsApp route triggers */}
                   <div className="flex flex-col gap-2.5 pt-2 border-t border-border/10">
+                    {activeLead && (
+                      <Link
+                        href={`/proposals/${activeLead.id}`}
+                        target="_blank"
+                        className="w-full"
+                      >
+                        <Button
+                          variant="gold"
+                          size="sm"
+                          className="w-full text-xs font-bold gap-2"
+                        >
+                          <Building className="h-4 w-4" /> Open Branded Client Proposal
+                        </Button>
+                      </Link>
+                    )}
                     <Button
                       variant="glass"
                       size="sm"
