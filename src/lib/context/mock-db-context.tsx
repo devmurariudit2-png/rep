@@ -16,12 +16,13 @@ interface MockDbContextType {
   leads: Lead[];
   currentUser: User | null;
   isLoading: boolean;
-  addLead: (leadData: Omit<Lead, "id" | "createdAt" | "aiScore" | "leadQuality" | "aiReasoning" | "whatsAppStatus" | "whatsAppHistory" | "activityLog">) => void;
+  addLead: (leadData: Omit<Lead, "id" | "createdAt" | "aiScore" | "leadQuality" | "aiReasoning" | "whatsAppStatus" | "whatsAppHistory" | "activityLog" | "autopilot">) => void;
   updateLeadStatus: (leadId: string, status: Lead["status"]) => void;
   deleteLead: (leadId: string) => void;
   addProperty: (property: Property) => void;
   deleteProperty: (propertyId: string) => void;
   sendWhatsAppMessage: (leadId: string, messageText: string, sender: "agent" | "system") => void;
+  toggleLeadAutopilot: (leadId: string, autopilot: boolean) => Promise<void>;
   login: (email: string, role: User["role"], name?: string) => Promise<boolean>;
   signup: (name: string, email: string, role: User["role"]) => Promise<boolean>;
   logout: () => void;
@@ -232,7 +233,8 @@ export function MockDbProvider({ children }: { children: React.ReactNode }) {
             createdAt: l.created_at,
             whatsAppStatus: l.whatsapp_status as Lead["whatsAppStatus"],
             whatsAppHistory: l.whatsapp_history as WhatsAppMessage[],
-            activityLog: l.activity_log
+            activityLog: l.activity_log,
+            autopilot: !!l.autopilot
           }));
           setLeads(mappedLeads);
         } else {
@@ -329,7 +331,7 @@ export function MockDbProvider({ children }: { children: React.ReactNode }) {
   };
 
   // Add lead and simulate WhatsApp Auto-Reply and AI Score
-  const addLead = async (leadData: Omit<Lead, "id" | "createdAt" | "aiScore" | "leadQuality" | "aiReasoning" | "whatsAppStatus" | "whatsAppHistory" | "activityLog">) => {
+  const addLead = async (leadData: Omit<Lead, "id" | "createdAt" | "aiScore" | "leadQuality" | "aiReasoning" | "whatsAppStatus" | "whatsAppHistory" | "activityLog" | "autopilot">) => {
     const newLead = generateNewLead(leadData);
 
     if (supabase) {
@@ -348,7 +350,8 @@ export function MockDbProvider({ children }: { children: React.ReactNode }) {
         whatsapp_status: newLead.whatsAppStatus,
         whatsapp_history: newLead.whatsAppHistory,
         activity_log: newLead.activityLog,
-        created_at: newLead.createdAt
+        created_at: newLead.createdAt,
+        autopilot: false
       };
 
       // Optimistic client update
@@ -522,28 +525,94 @@ export function MockDbProvider({ children }: { children: React.ReactNode }) {
   };
 
   const sendWhatsAppMessage = async (leadId: string, messageText: string, sender: "agent" | "system" = "agent") => {
+    if (supabase) {
+      try {
+        const response = await fetch("/api/whatsapp/send", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ leadId, message: messageText, sender }),
+        });
+        if (response.ok) {
+          const data = await response.json();
+          if (data.success && data.lead) {
+            const mappedLead = {
+              id: data.lead.id,
+              name: data.lead.name,
+              email: data.lead.email,
+              phone: data.lead.phone,
+              interestedPropertyId: data.lead.interested_property_id || "",
+              propertyName: data.lead.property_name,
+              status: data.lead.status as Lead["status"],
+              aiScore: Number(data.lead.ai_score),
+              leadQuality: data.lead.lead_quality as Lead["leadQuality"],
+              aiReasoning: data.lead.ai_reasoning,
+              createdAt: data.lead.created_at,
+              whatsAppStatus: data.lead.whatsapp_status as Lead["whatsAppStatus"],
+              whatsAppHistory: data.lead.whatsapp_history as WhatsAppMessage[],
+              activityLog: data.lead.activity_log,
+              autopilot: !!data.lead.autopilot
+            };
+            setLeads(prev => prev.map((l) => l.id === leadId ? mappedLead : l));
+            return;
+          }
+        }
+      } catch (err) {
+        console.error("Error sending WhatsApp message via API:", err);
+      }
+    }
+
+    // Heuristic/mock fallback
     const lead = leads.find((l) => l.id === leadId);
     if (!lead) return;
 
-    const updatedLead = sendWhatsAppMessageHelper(lead, messageText, sender);
+    const updatedLead = {
+      ...sendWhatsAppMessageHelper(lead, messageText, sender),
+      autopilot: false // broker override deactivates autopilot
+    };
     setLeads(prev => prev.map((l) => l.id === leadId ? updatedLead : l));
 
+    if (!supabase) {
+      const updated = leads.map((l) => l.id === leadId ? updatedLead : l);
+      saveLeadsState(updated);
+    }
+  };
+
+  const toggleLeadAutopilot = async (leadId: string, autopilot: boolean) => {
+    setLeads(prev => prev.map((l) => l.id === leadId ? { ...l, autopilot } : l));
+
     if (supabase) {
+      const lead = leads.find((l) => l.id === leadId);
+      const currentActivityLog = lead?.activityLog || [];
+      const updatedActivityLog = [
+        ...currentActivityLog,
+        { action: `AI Auto-Pilot toggled ${autopilot ? "ON" : "OFF"}`, timestamp: new Date().toISOString() }
+      ];
+
       const { error } = await supabase
         .from("leads")
         .update({
-          whatsapp_status: updatedLead.whatsAppStatus,
-          whatsapp_history: updatedLead.whatsAppHistory,
-          activity_log: updatedLead.activityLog
+          autopilot,
+          activity_log: updatedActivityLog
         })
         .eq("id", leadId);
 
       if (error) {
-        console.error("Error sending WhatsApp message to Supabase:", error);
+        console.error("Error toggling lead autopilot in Supabase:", error);
       }
     } else {
-      const updated = leads.map((l) => l.id === leadId ? updatedLead : l);
-      saveLeadsState(updated);
+      const lead = leads.find((l) => l.id === leadId);
+      if (lead) {
+        const updatedLead = {
+          ...lead,
+          autopilot,
+          activityLog: [
+            ...lead.activityLog,
+            { action: `AI Auto-Pilot toggled ${autopilot ? "ON" : "OFF"}`, timestamp: new Date().toISOString() }
+          ]
+        };
+        const updated = leads.map((l) => l.id === leadId ? updatedLead : l);
+        saveLeadsState(updated);
+      }
     }
   };
 
@@ -659,6 +728,7 @@ export function MockDbProvider({ children }: { children: React.ReactNode }) {
         addProperty,
         deleteProperty,
         sendWhatsAppMessage,
+        toggleLeadAutopilot,
         login,
         signup,
         logout,

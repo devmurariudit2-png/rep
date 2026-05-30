@@ -101,7 +101,8 @@ CREATE TABLE IF NOT EXISTS public.leads (
   ai_reasoning text NOT NULL,
   whatsapp_status text NOT NULL CHECK (whatsapp_status IN ('delivered', 'replied', 'pending', 'none')) DEFAULT 'none',
   whatsapp_history jsonb NOT NULL DEFAULT '[]'::jsonb,
-  activity_log jsonb NOT NULL DEFAULT '[]'::jsonb
+  activity_log jsonb NOT NULL DEFAULT '[]'::jsonb,
+  autopilot boolean NOT NULL DEFAULT false
 );
 
 -- Enable RLS on Leads

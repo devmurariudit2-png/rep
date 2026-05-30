@@ -24,6 +24,7 @@ export interface Lead {
   whatsAppStatus: "delivered" | "replied" | "pending" | "none";
   whatsAppHistory: WhatsAppMessage[];
   activityLog: Activity[];
+  autopilot?: boolean;
 }
 
 export const mockLeads: Lead[] = [

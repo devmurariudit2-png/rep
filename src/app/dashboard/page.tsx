@@ -62,6 +62,7 @@ export default function DashboardPage() {
     addProperty,
     deleteProperty,
     sendWhatsAppMessage,
+    toggleLeadAutopilot,
     logout,
     uploadPropertyImage,
     refreshDb
@@ -605,6 +606,29 @@ export default function DashboardPage() {
                     </p>
                   </div>
 
+                  {/* AI Auto-Pilot Toggle */}
+                  {activeLead && (
+                    <div className="flex items-center justify-between p-3 rounded-xl bg-black/10 dark:bg-white/5 border border-white/5 shadow-inner">
+                      <div className="flex flex-col gap-0.5">
+                        <span className="text-[10px] font-bold text-foreground uppercase tracking-wider">AI Auto-Pilot</span>
+                        <span className="text-[8px] text-muted-foreground font-semibold">Gemini virtual agent auto-replies</span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => toggleLeadAutopilot(activeLead.id, !activeLead.autopilot)}
+                        className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                          activeLead.autopilot ? "bg-emerald-500" : "bg-zinc-600"
+                        }`}
+                      >
+                        <span
+                          className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                            activeLead.autopilot ? "translate-x-4" : "translate-x-0"
+                          }`}
+                        />
+                      </button>
+                    </div>
+                  )}
+
                   {/* Update Pipeline Stage selector */}
                   <div className="flex flex-col gap-2">
                     <span className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">
@@ -853,9 +877,25 @@ export default function DashboardPage() {
                     <span className="text-xs font-bold text-foreground">{activeLead?.name || "Chat Logs"}</span>
                     <span className="text-[9px] text-muted-foreground font-semibold font-mono">WhatsApp Channel: {activeLead?.phone}</span>
                   </div>
-                  <Badge variant={activeLead?.leadQuality || "cold"}>
-                    Score {activeLead?.aiScore || 0}
-                  </Badge>
+                  <div className="flex items-center gap-3">
+                    {activeLead && (
+                      <button
+                        type="button"
+                        onClick={() => toggleLeadAutopilot(activeLead.id, !activeLead.autopilot)}
+                        className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[9px] font-bold uppercase tracking-wider transition-all border ${
+                          activeLead.autopilot
+                            ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-400"
+                            : "bg-zinc-800/40 border-zinc-700/30 text-zinc-400"
+                        }`}
+                      >
+                        <span className={`h-1.5 w-1.5 rounded-full ${activeLead.autopilot ? "bg-emerald-400 animate-pulse" : "bg-zinc-500"}`} />
+                        {activeLead.autopilot ? "AI Autopilot ON" : "Manual Mode"}
+                      </button>
+                    )}
+                    <Badge variant={activeLead?.leadQuality || "cold"}>
+                      Score {activeLead?.aiScore || 0}
+                    </Badge>
+                  </div>
                 </div>
 
                 {/* Dialog Messages list */}
